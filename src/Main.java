@@ -228,6 +228,10 @@ public class Main {
 		return false;
 	}
 	
+	public static boolean checkJungle(int x, int y) {
+		return !checkTop(x, y) && !checkMid(x, y) && !checkBot(x, y);
+	}
+	
 	public static boolean checkMid(int x, int y) {
 		return mid.complexIsInside(x, y);
 	}
@@ -249,193 +253,165 @@ public class Main {
 	// MARK: MATCH INFO INVOLVING TIME
 	// *********************************************************************************************
 	
-	public static JSONObject getTimeline(long matchId) throws Exception {
+	public static JSONObject getTimeline(BigInteger matchId) throws Exception {
 		String link = apiurl 
 				+ "match/v3/timelines/by-match/" + matchId
 				+ "?api_key=" + apiKey;
 		String timeline = getHTML(link);
-		System.out.println(timeline);
 		return new JSONObject(timeline);
 	}
 
 	
 	// returns 1 or 0 based on if solo kill happened (based on killer, victim, and LOCATION of the kill)
-	public static int soloKill(Match m, int killerId, int victimId, JSONArray assists) throws Exception{
+	public static int soloKill(Match m, int killerId, int victimId, JSONArray assists, int locationx, int locationy) throws Exception{
 		
 		Player player = m.getMainPlayer();
-		Player companion = null;
-		Player oppositePlayer = m.getOppositePlayer(player);
-		Player oppositePlayer2 = null;
 		
-		boolean botCheck = false;
+		boolean correctLocation = false;
 		
-		// bot lane can kill either bot or support and still call it "solo kill"
-		if (player.role.equals("bot") || player.role.equals("supp")) {
-			companion = m.getCompanionPlayer(player);
-			oppositePlayer2 = m.getCompanionPlayer(oppositePlayer);
-			botCheck = true;
+		// first make sure that kill occurred within player's lane
+		if (player.role.equals("top")) {
+			correctLocation = checkTop(locationx, locationy);
+		} else if (player.role.equals("jungle")) {
+			correctLocation = checkJungle(locationx, locationy);
+		} else if (player.role.equals("mid")) {
+			correctLocation = checkMid(locationx, locationy);
+		} else {
+			correctLocation = checkBot(locationx, locationy);
 		}
 		
-		int numAssists = assists.length();
 		
 		// num solo kills
 		int num = 0;
 		
-		
-		// first check if the main player is a bot laner or not
-		if (botCheck) {
+		if (correctLocation) {
+			System.out.println("LOCATION OF KILL PASSED");
+			Player companion = null;
+			Player oppositePlayer = m.getOppositePlayer(player);
+			Player oppositePlayer2 = null;
 			
-			// victim is bot laner
-			if (victimId == oppositePlayer.pId || victimId == oppositePlayer2.pId) {
+			boolean botCheck = false;
+			
+			// bot lane can kill either bot or support and still call it "solo kill"
+			if (player.role.equals("bot") || player.role.equals("supp")) {
+				companion = m.getCompanionPlayer(player);
+				oppositePlayer2 = m.getCompanionPlayer(oppositePlayer);
+				botCheck = true;
+			}
+			
+			int numAssists = assists.length();
+			
+			
+			// first check if the main player is a bot laner or not
+			if (botCheck) {
 				
-				// killer is player 
-				if (killerId == player.pId) {
+				// victim is bot laner
+				if (victimId == oppositePlayer.pId || victimId == oppositePlayer2.pId) {
 					
-					// either no assists or whoever got the assist is other bot laner
-					if (numAssists == 0 || (numAssists == 1 && assists.getInt(0) == companion.pId)) {
-						num++;
+					// killer is player 
+					if (killerId == player.pId) {
+						
+						// either no assists or whoever got the assist is other bot laner
+						if (numAssists == 0 || (numAssists == 1 && assists.getInt(0) == companion.pId)) {
+							num++;
+						}
+						
+					// killer is companion
+					} else if (killerId == companion.pId) {
+						
+						// main player got the only assist
+						if (numAssists == 1 && assists.getInt(0) == player.pId) {
+							num++;
+						}
 					}
 					
-				// killer is companion
-				} else if (killerId == companion.pId) {
-					
-					// main player got the only assist
-					if (numAssists == 1 && assists.getInt(0) == player.pId) {
+				} 
+			
+			// if not bot laner all you need to check is that victim was opposite laner and there were 0 assists
+			} else {
+				if (numAssists == 0 && killerId == player.pId) {
+					if (victimId == oppositePlayer.pId) {
 						num++;
 					}
-				}
-				
-			} 
-		
-		// if not bot laner all you need to check is that victim was opposite laner and there were 0 assists
-		} else {
-			if (numAssists == 0 && killerId == player.pId) {
-				if (victimId == oppositePlayer.pId) {
-					num++;
 				}
 			}
 		}
 		
+		
 		return num;
 	}
 	
-//	public static Map<String, Long> getPreTwentyStats(JSONObject timeline, Match m) throws Exception {
-//		
-//		JSONArray frames = timeline.getJSONArray("frames");
-//		
-//		// timeline: time of latest event; index: frame #
-//		int index = 0;
-//		JSONObject frameobj = frames.getJSONObject(index);
-//		int numFrames = frameobj.length();
-//		long timestamp = frameobj.getLong("timestamp");
-//		
-//		int numSoloKills = 0;
-//		int numGanks = 0;
-//		long firstGank = 0;
-//		long riftHerald = 0;
-//		int firstRift = 0; // 0 means false, 1 means true
-//		
-//		// timestamp is based on milliseconds; 20 min = 1,200,000 ms (add half a minute for sake of accuracy)
-//		// make sure timestamp begins at ~1min 30 or so to not include early game invades (unrelated to laning)
-//		while (timestamp < 1230000) {
-//			JSONArray events = frameobj.getJSONArray("events");
-//			
-//			// check events for a champion kill
-//			for (int i = 0; i < events.length(); i++) {
-//				JSONObject event = events.getJSONObject(i);
-//				if (event.getString("type").equals("CHAMPION_KILL")) {
-//					
-//					
-//					// kill participants (kill, assist, death)
-//					JSONArray assists = event.getJSONArray("assistingParticipantIds");
-//					
-//					int killerId = event.getInt("killerId");
-//					int victimId = event.getInt("victimId");
-//					
-//					numSoloKills += soloKill(m, killerId, victimId, assists);
-//					
-////					// ***SUCCESSFUL ROAMS***
-////					// for this you are looking at location of kill as well as who died
-////					if (numAssists == 0) {
-////						if (victimId != oppLanerId && victimId != oppLanerId2) {
-////							numGanks++;
-////						}
-////					} else {
-////						for (int j = 0; j < assists.length(); j++) {
-////							if (assists.getInt(j) == pId) {
-////								
-////								// check if victim was not in the same lane
-////								if (victimId != oppLanerId && victimId != oppLanerId2) {
-////									numGanks++;
-////								}							
-////							}
-////						}
-////					}
-//					
-//					
-//					
-////					// ***FIRST GANK TIME***
-////					if (pRole.substring(1).equals("_JUNGLE") && victimId != oppLanerId && firstGank == 0) {
-////						if (playerGotAssist || playerGotKill) {
-////							// get timestamp
-////							firstGank = event.getLong("timestamp");
-////							System.out.println(firstGank);
-////						} 
-////					}
+	public static int getPreTwentyStats(JSONObject timeline, Match m) throws Exception {
+		
+		JSONArray frames = timeline.getJSONArray("frames");
+		int numFrames = frames.length();
+		
+		// timeline: time of latest event; index: frame #
+		int index = 0;
+		JSONObject frameobj = frames.getJSONObject(index);
+		long timestamp = frameobj.getLong("timestamp");
+		
+		int numSoloKills = 0;
+		int numGanks = 0;
+		long firstGank = 0;
+		long riftHerald = 0;
+		int firstRift = 0; // 0 means false, 1 means true
+		
+		// timestamp is based on milliseconds; 20 min = 1,200,000 ms (add half a minute for sake of accuracy)
+		// make sure timestamp begins at ~1min 30 or so to not include early game invades (unrelated to laning)
+		while (timestamp < 1230000) {
+			JSONArray events = frameobj.getJSONArray("events");
+			// check events for a champion kill
+			for (int i = 0; i < events.length(); i++) {
+				JSONObject event = events.getJSONObject(i);
+				if (event.getString("type").equals("CHAMPION_KILL")) {
+					
+					
+					// kill participants (kill, assist, death)
+					JSONArray assists = event.getJSONArray("assistingParticipantIds");
+					
+					int killerId = event.getInt("killerId");
+					int victimId = event.getInt("victimId");
+					
+					JSONObject position = event.getJSONObject("position");
+					int locationx = position.getInt("x");
+					int locationy = position.getInt("y");
+							
+					numSoloKills += soloKill(m, killerId, victimId, assists, locationx, locationy);
+						
+				}
+				
+				// only need to check this if player is a jungler
+//				if (pRole.substring(1).equals("_JUNGLE")) {
+//					if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
 //						
+//						String monsterType = event.getString("monsterType"); 
+//						int killerId = event.getInt("killerId");
+//						
+//						// ***RIFT HERALD TIME***
+//						// only one rift herald, so only need to do this once
+//						if (monsterType.equals("RIFTHERALD") && killerId == pId) {
+//							riftHerald = event.getLong("timestamp");
+//							firstRift = 1;
+//						}
+//					}
 //				}
-//				
-//				// only need to check this if player is a jungler
-////				if (pRole.substring(1).equals("_JUNGLE")) {
-////					if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
-////						
-////						String monsterType = event.getString("monsterType"); 
-////						int killerId = event.getInt("killerId");
-////						
-////						// ***RIFT HERALD TIME***
-////						// only one rift herald, so only need to do this once
-////						if (monsterType.equals("RIFTHERALD") && killerId == pId) {
-////							riftHerald = event.getLong("timestamp");
-////							firstRift = 1;
-////						}
-////					}
-////				}
-////				if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
-////					
-////					String monsterType = event.getString("monsterType"); 
-////					int killerId = event.getInt("killerId");
-////					
-////					// ***RIFT HERALD TIME***
-////					// only one rift herald, so only need to do this once
-////					if (monsterType.equals("RIFTHERALD") && killerId == pId) {
-////						riftHerald = event.getLong("timestamp");
-////						firstRift = 1;
-////					}
-////					
-////				}
-//				
-//			}
-//			index++;
-//			
-//			// some games may not go to 20 minutes
-//			if (index >= numFrames) {
-//				frameobj = frames.getJSONObject(index);
-//				timestamp = frameobj.getLong("timestamp");
-//			} else {
-//				timestamp = 1230000;
-//			}
-//			
-//		}
-//		
-//		Map<String, Long> pre20 = new HashMap<String, Long>();
-//		pre20.put("solokills", (long) numSoloKills);
-//		pre20.put("ganks", (long) numGanks);
-//		pre20.put("firstgank", firstGank);
-//		pre20.put("riftherald", riftHerald);
-//		pre20.put("firstrift", (long) firstRift); 
-//		
-//		return pre20;
-//	}
+				
+			}
+			index++;
+			
+			// some games may not go to 20 minutes
+			if (index < numFrames) {
+				frameobj = frames.getJSONObject(index);
+				timestamp = frameobj.getLong("timestamp");
+			} else {
+				timestamp = 1230000;
+			}
+			
+		}
+		
+		return numSoloKills;
+	}
 	
 	// *********************************************************************************************
 	// MARK: INITIAL POINT OF STAT SEARCH
@@ -481,7 +457,7 @@ public class Main {
 //	}
 	
 	public static void main(String[] args) throws Exception{
-		int champNum = 69; //cass
+		int champNum = 157; //69 cass 157 yasuo
 		
 		BigInteger bi = new BigInteger("2547914630");
 		JSONObject matchobj = getMatchById(bi);
@@ -489,8 +465,13 @@ public class Main {
 		Match m = createPlayers(matchobj, champNum);
 		StandardStat ss = new StandardStat();
 		
-		addStandard(matchobj, m, ss);
-		ss.printLast();
+//		addStandard(matchobj, m, ss);
+//		ss.printLast();
+		
+		
+		JSONObject t = getTimeline(bi);
+		System.out.println(getPreTwentyStats(t, m));
+//		
 //		
 //
 //		

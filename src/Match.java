@@ -17,7 +17,7 @@ public class Match {
 			} 
 			
 			// sort allPlayers so you can get players by ID
-			allPlayers[p.pId - 1] = p;
+			this.allPlayers[p.pId - 1] = p;
 		}
 	}
 	
@@ -62,6 +62,17 @@ public class Match {
 		}
 		
 		return result;
+	}
+	
+	public void printMain() {
+		System.out.println("id: " + player.pId + " role: " + player.role + " team: " + player.team);
+	}
+	public void printAll() {
+		
+		for (int i = 0; i < allPlayers.length; i++) {
+			Player p = allPlayers[i];
+			System.out.println("id: " + p.pId + " role: " + p.role + " team: " + p.team);
+		}
 	}
 	
 	
