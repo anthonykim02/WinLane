@@ -246,7 +246,7 @@ public class Main {
 			return true;
 		}
 		
-		return true;
+		return false;
 	}
 	
 	// *********************************************************************************************
@@ -262,8 +262,9 @@ public class Main {
 	}
 
 	
-	// returns 1 or 0 based on if solo kill happened (based on killer, victim, and LOCATION of the kill)
-	public static int soloKill(Match m, int killerId, int victimId, JSONArray assists, int locationx, int locationy) throws Exception{
+	// returns array length 2 with values 1 or 0 based on if solo kill/death happened 
+	// (based on killer, victim, and LOCATION of the kill)
+	public static int[] soloKill(Match m, int killerId, int victimId, JSONArray assists, int locationx, int locationy) throws Exception{
 		
 		Player player = m.getMainPlayer();
 		
@@ -282,7 +283,8 @@ public class Main {
 		
 		
 		// num solo kills
-		int num = 0;
+		int wasSK = 0;
+		int wasSD = 0;
 		
 		if (correctLocation) {
 			Player companion = null;
@@ -312,7 +314,7 @@ public class Main {
 						
 						// either no assists or whoever got the assist is other bot laner
 						if (numAssists == 0 || (numAssists == 1 && assists.getInt(0) == companion.pId)) {
-							num++;
+							wasSK++;
 						}
 						
 					// killer is companion
@@ -320,24 +322,111 @@ public class Main {
 						
 						// main player got the only assist
 						if (numAssists == 1 && assists.getInt(0) == player.pId) {
-							num++;
+							wasSK++;
 						}
 					}
 					
 				} 
+				
+				
+				// switch killer and victim id requirements for solo death
+				if (victimId == player.pId) {
+					
+					//killer can be either of the bot laners on enemy team
+					if (killerId == oppositePlayer.pId) {
+						
+						// either no assits or other bot laner gets the assist
+						if (numAssists == 0 || (numAssists == 1 && assists.getInt(0) == oppositePlayer2.pId)) {
+							wasSD++;
+						} 
+					} else if (killerId == oppositePlayer.pId) {
+						if (numAssists == 0 || (numAssists == 1 && assists.getInt(0) == oppositePlayer.pId)) {
+							wasSD++;
+						} 
+					}
+				}
 			
 			// if not bot laner all you need to check is that victim was opposite laner and there were 0 assists
 			} else {
 				if (numAssists == 0 && killerId == player.pId) {
 					if (victimId == oppositePlayer.pId) {
-						num++;
+						wasSK++;
+					}
+				}
+				
+				// switch killer and victim id requirements for solo death
+				if (numAssists == 0 && killerId == oppositePlayer.pId) {
+					if (victimId == player.pId) {
+						wasSD++;
 					}
 				}
 			}
 		}
 		
+		int[] result = new int[2];
+		result[0] = wasSK;
+		result[1] = wasSD;
 		
-		return num;
+		return result;
+	}
+	
+	public static int gank(Match m, int killerId, JSONArray assists, int locationx, int locationy) throws Exception {
+		
+		// 1 if top, 2 if mid, 3 if bot
+		int wasGank = 0;
+		
+		Player player = m.getMainPlayer();
+		
+		boolean checkLocation = false;
+		
+		boolean bot = checkBot(locationx, locationy);
+		boolean top = checkTop(locationx, locationy);
+		boolean mid = checkMid(locationx, locationy);
+		
+		// make sure location was a lane, not the same lane as laner
+		if (player.role.equals("top")) {
+			checkLocation = bot || mid; 
+		} else if (player.role.equals("jungle")) {
+			checkLocation = bot || top || mid;
+		} else if (player.role.equals("mid")) {
+			checkLocation = bot || top;
+		} else {
+			checkLocation = top || mid;
+		}
+		
+		if (checkLocation) {			
+			
+			if (killerId == player.pId) {
+				
+				// set this value only if gank was valid
+				if (bot) {
+					wasGank = 3;
+				} else if (mid) {
+					wasGank = 2;
+				} else if (top) {
+					wasGank = 1;
+				}
+				return wasGank;
+			} else {
+				for (int i = 0; i < assists.length(); i++) {
+					int a = assists.getInt(i);
+					if (a == player.pId) {
+						
+						// set this value only if gank was valid
+						if (bot) {
+							wasGank = 3;
+						} else if (mid) {
+							wasGank = 2;
+						} else if (top) {
+							wasGank = 1;
+						}
+						return wasGank;
+					}
+				}
+			}
+		}
+
+		return wasGank;
 	}
 
 	public static void addPreTwentyStats(JSONObject timeline, Match m, PreTwentyStat pts) throws Exception {
@@ -352,12 +441,27 @@ public class Main {
 		
 		Player player = m.getMainPlayer();
 		
+		
+		// STATS TO CALCULATE
+		
+		// solo
 		int numSoloKills = 0;
+		int numSoloDeaths = 0;
+		
+		// ganks
+		int numMidGanks = 0;
+		int numTopGanks = 0;
+		int numBotGanks = 0;
+		long firstGankTime = 0;
+		boolean ganked = false;
+		
+		// jungle monsters
 		long riftHerald = 0;
 		boolean firstRift = false;
 		long dragon = 0;
 		boolean firstDragInGame = false;
 		boolean gotFirstDrag = false;
+		
 		
 		// timestamp is based on milliseconds; 20 min = 1,200,000 ms (add half a minute for sake of accuracy)
 		// make sure timestamp begins at ~1min 30 or so to not include early game invades (unrelated to laning)
@@ -379,7 +483,29 @@ public class Main {
 					int locationx = position.getInt("x");
 					int locationy = position.getInt("y");
 							
-					numSoloKills += soloKill(m, killerId, victimId, assists, locationx, locationy);
+					int[] kd = soloKill(m, killerId, victimId, assists, locationx, locationy);
+					numSoloKills += kd[0];
+					numSoloDeaths += kd[1];
+					
+					int g = gank(m, killerId, assists, locationx, locationy);
+					
+					// if gank was yours AND successful AND you have not gotten a successful gank before
+					// record the time of the gank
+					if (g != 0 && !ganked) {
+						firstGankTime = event.getLong("timestamp");
+						ganked = true;
+					}
+					
+					// increase appropriate lane counter
+					if (g == 1) {
+						numTopGanks++;
+						System.out.println(event.getLong("timestamp"));
+					} else if (g == 2) {
+						numMidGanks++;
+					} else if (g == 3) {
+						numBotGanks++;
+					}
+					
 						
 				}
 				
@@ -420,7 +546,7 @@ public class Main {
 			
 		}
 		
-		pts.add(numSoloKills, dragon, gotFirstDrag, riftHerald, firstRift);
+		pts.add(numSoloKills, numSoloDeaths, numTopGanks, numMidGanks, numBotGanks, dragon, gotFirstDrag, riftHerald, firstRift);
 	}
 	
 	// *********************************************************************************************
@@ -483,6 +609,8 @@ public class Main {
 		PreTwentyStat pts = new PreTwentyStat();
 		addPreTwentyStats(t, m, pts);
 		pts.printLast();
+		
+
 //		
 //		
 //
