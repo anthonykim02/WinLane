@@ -285,7 +285,6 @@ public class Main {
 		int num = 0;
 		
 		if (correctLocation) {
-			System.out.println("LOCATION OF KILL PASSED");
 			Player companion = null;
 			Player oppositePlayer = m.getOppositePlayer(player);
 			Player oppositePlayer2 = null;
@@ -340,8 +339,8 @@ public class Main {
 		
 		return num;
 	}
-	
-	public static int getPreTwentyStats(JSONObject timeline, Match m) throws Exception {
+
+	public static void addPreTwentyStats(JSONObject timeline, Match m, PreTwentyStat pts) throws Exception {
 		
 		JSONArray frames = timeline.getJSONArray("frames");
 		int numFrames = frames.length();
@@ -351,11 +350,14 @@ public class Main {
 		JSONObject frameobj = frames.getJSONObject(index);
 		long timestamp = frameobj.getLong("timestamp");
 		
+		Player player = m.getMainPlayer();
+		
 		int numSoloKills = 0;
-		int numGanks = 0;
-		long firstGank = 0;
 		long riftHerald = 0;
-		int firstRift = 0; // 0 means false, 1 means true
+		boolean firstRift = false;
+		long dragon = 0;
+		boolean firstDragInGame = false;
+		boolean gotFirstDrag = false;
 		
 		// timestamp is based on milliseconds; 20 min = 1,200,000 ms (add half a minute for sake of accuracy)
 		// make sure timestamp begins at ~1min 30 or so to not include early game invades (unrelated to laning)
@@ -382,20 +384,28 @@ public class Main {
 				}
 				
 				// only need to check this if player is a jungler
-//				if (pRole.substring(1).equals("_JUNGLE")) {
-//					if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
-//						
-//						String monsterType = event.getString("monsterType"); 
-//						int killerId = event.getInt("killerId");
-//						
-//						// ***RIFT HERALD TIME***
-//						// only one rift herald, so only need to do this once
-//						if (monsterType.equals("RIFTHERALD") && killerId == pId) {
-//							riftHerald = event.getLong("timestamp");
-//							firstRift = 1;
-//						}
-//					}
-//				}
+				if (player.role.equals("jungle")) {
+					if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
+						
+						String monsterType = event.getString("monsterType"); 
+						int killerId = event.getInt("killerId");
+						Player killer = m.getPlayer(killerId);
+
+						// check monster type and whether the first drag has been recorded or not
+						if (monsterType.equals("RIFTHERALD")) {
+							if (killer.onPlayerTeam) {
+								riftHerald = event.getLong("timestamp");
+								firstRift = true;
+							}
+						} else if ((monsterType.equals("DRAGON")) && !firstDragInGame) {
+							if (killer.onPlayerTeam) {
+								dragon = event.getLong("timestamp");
+								gotFirstDrag = true;
+							}
+							firstDragInGame = true;
+						}
+					}
+				}
 				
 			}
 			index++;
@@ -410,7 +420,7 @@ public class Main {
 			
 		}
 		
-		return numSoloKills;
+		pts.add(numSoloKills, dragon, gotFirstDrag, riftHerald, firstRift);
 	}
 	
 	// *********************************************************************************************
@@ -457,7 +467,7 @@ public class Main {
 //	}
 	
 	public static void main(String[] args) throws Exception{
-		int champNum = 157; //69 cass 157 yasuo
+		int champNum = 102; //69 cass 157 yasuo 102 shyvana
 		
 		BigInteger bi = new BigInteger("2547914630");
 		JSONObject matchobj = getMatchById(bi);
@@ -470,7 +480,9 @@ public class Main {
 		
 		
 		JSONObject t = getTimeline(bi);
-		System.out.println(getPreTwentyStats(t, m));
+		PreTwentyStat pts = new PreTwentyStat();
+		addPreTwentyStats(t, m, pts);
+		pts.printLast();
 //		
 //		
 //
@@ -490,9 +502,6 @@ public class Main {
 //		for (String k : y.keySet()) {
 //			System.out.println(k + ": " + y.get(k));
 //		}
-		
-
-		
 		
 	}
 }
