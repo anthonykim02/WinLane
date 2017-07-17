@@ -2,7 +2,7 @@
 
 public class AvgStandardStat {
 	
-	// stats: k/d/a, cs/min, winrate, damage/min, damage%, kill participation, cs difference @20
+	// stats: k/d/a, cs/min, winrate, damage/min, damage%, kill participation, cs difference @20, enemy jungle cs
 	double kda;
 	double csmin;
 	double wl;
@@ -10,9 +10,10 @@ public class AvgStandardStat {
 	double dmgP;
 	double kp;
 	double csd20;
+	double enemyjg;
 	
 	public AvgStandardStat(double kda, double csmin, double wl, double  dmin,
-			double dmgP, double kp, double csd20) {
+			double dmgP, double kp, double csd20, double enemyjg) {
 		this.kda = kda;
 		this.csmin = csmin;
 		this.wl = wl;
@@ -20,5 +21,6 @@ public class AvgStandardStat {
 		this.dmgP = dmgP;
 		this.kp = kp;
 		this.csd20 = csd20;
+		this.enemyjg = enemyjg;
 	}
 }

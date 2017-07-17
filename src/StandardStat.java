@@ -8,8 +8,12 @@ public class StandardStat {
 	LinkedList<Boolean> winOrLoss;
 	LinkedList<Double> dmin;
 	LinkedList<Double> dmgP;
+	LinkedList<Double> dmgt20;
+	LinkedList<Double> xpd20;
 	LinkedList<Double> kp;
 	LinkedList<Double> csd20;
+	LinkedList<Integer> enemyjg;
+	
 //	double dminDiff;
 	
 	public StandardStat() {
@@ -18,19 +22,25 @@ public class StandardStat {
 		winOrLoss = new LinkedList();
 		dmin = new LinkedList();
 		dmgP = new LinkedList();
+		dmgt20 = new LinkedList();
+		xpd20 = new LinkedList();
 		kp = new LinkedList();
 		csd20 = new LinkedList();
+		enemyjg = new LinkedList();
 	}
 	
-	public void add(double kdaVal, double csminVal, boolean wlVal, 
-			double dminVal, double dmgPval, double kpVal, double csd20Val) {
+	public void add(double kdaVal, double csminVal, boolean wlVal, double dminVal, double dmgPval, 
+			double dmgtVal, double xpdVal, double kpVal, double csd20Val, int enemyjgVal) {
 		kda.add(kdaVal);
 		csmin.add(csminVal);
 		winOrLoss.add(wlVal);
 		dmin.add(dminVal);
 		dmgP.add(dmgPval);
+		dmgt20.add(dmgtVal);
+		xpd20.add(xpdVal);
 		kp.add(kpVal);
 		csd20.add(csd20Val);
+		enemyjg.add(enemyjgVal);
 	}
 
 	public AvgStandardStat findAverage() {
@@ -43,8 +53,12 @@ public class StandardStat {
 		double totalWins = 0;
 		double totalDPM = 0;
 		double totalDP = 0;
+		// add xp and dmgt
+		
+		
 		double totalKP = 0;
 		double totalCSDiff = 0;
+		double totalJgCS = 0;
 		
 		// get stat totals
 		for (int i = 0; i < numGames; i++) {
@@ -54,6 +68,7 @@ public class StandardStat {
 			totalDP += dmgP.get(i);
 			totalKP += kp.get(i);
 			totalCSDiff += csd20.get(i);
+			totalJgCS += enemyjg.get(i);
 			
 			if (winOrLoss.get(i)) {
 				totalWins++;
@@ -68,19 +83,23 @@ public class StandardStat {
 		double avgDP = totalDP / numGames;
 		double avgKP = totalKP / numGames;
 		double avgCSDiff = totalCSDiff / numGames;
+		double avgJgCS = totalJgCS / numGames;
 		
-		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgKP, avgCSDiff);
+		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgKP, avgCSDiff, avgJgCS);
 		
 		return ass;
 	}
 	
 	public void printLast() {
-		System.out.println(kda.getLast());
-		System.out.println(csmin.getLast());
-		System.out.println(winOrLoss.getLast());
-		System.out.println(dmin.getLast());
-		System.out.println(dmgP.getLast());
-		System.out.println(kp.getLast());
-		System.out.println(csd20.getLast());
+		System.out.println("KDA: " + kda.getLast());
+		System.out.println("CS/min: " + csmin.getLast());
+		System.out.println("Win Or Loss: " + winOrLoss.getLast());
+		System.out.println("DMG/min: " + dmin.getLast());
+		System.out.println("DMG%: " + dmgP.getLast());
+		System.out.println("DMGtaken @20: " + dmgt20.getLast());
+		System.out.println("XPdiff @20: " + xpd20.getLast());
+		System.out.println("KP: " + kp.getLast());
+		System.out.println("CSdiff @20: " + csd20.getLast());
+		System.out.println("EnemyJG CS: " + enemyjg.getLast());
 	}
 }

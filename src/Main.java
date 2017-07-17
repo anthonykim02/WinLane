@@ -12,7 +12,7 @@ public class Main {
 	static String apiurl = "https://na1.api.riotgames.com/lol/";
 	
 	// key to use the api, may need to reuse (DO NOT use this for final product)
-	static String apiKey = "RGAPI-ab791f0d-8750-4f4c-a335-3360bd2d61b9";
+	static String apiKey = "RGAPI-93e05338-2b87-49eb-bb2b-9e7ca88e0c1d";
 	
 	
 	
@@ -199,6 +199,12 @@ public class Main {
 		double csd20 = csd.getDouble("10-20") * 10;
 		double csDiff = csd10 + csd20;
 		
+		//***XPD@20***
+		JSONObject xpd = timeline.getJSONObject("xpDiffPerMinDeltas");
+		double xpd10 = xpd.getDouble("0-10") * 10;
+		double xpd20 = xpd.getDouble("10-20") * 10;
+		double xpDiff = xpd10 + xpd20;
+		
 		// ***DAMAGE/MIN***
 		long dmg = stats.getLong("totalDamageDealtToChampions");
 		double dpm = (double) dmg / minutes;
@@ -206,9 +212,18 @@ public class Main {
 		// ***DAMAGE %***
 		double dp = (double) dmg / (double) totalDamage;
 		
+		// ***DAMAGE TAKEN @20***
+		JSONObject dmgt = timeline.getJSONObject("damageTakenPerMinDeltas");
+		double dmgt10 = dmgt.getDouble("0-10") * 10;
+		double dmgt20 = dmgt.getDouble("10-20") * 10;
+		double dmgTaken = dmgt10 + dmgt20;
+		
+		// ***ENEMY JG CS***
+		int enemyjg = stats.getInt("neutralMinionsKilledEnemyJungle");
+		
 		
 		// add to list of standard stats for that champion
-		ss.add(kda, cspm, wl, dpm, dp, kp, csDiff);
+		ss.add(kda, cspm, wl, dpm, dp, dmgTaken, xpDiff, kp, csDiff, enemyjg);
 	}
 	
 	// *********************************************************************************************
@@ -428,6 +443,43 @@ public class Main {
 
 		return wasGank;
 	}
+	
+	public static String whoGotFirstTower(Match m, int killerId, JSONArray assists, String lane) throws Exception{
+		
+		String result = "";
+		
+		Player player = m.getMainPlayer();
+		Player opponent = m.getOppositePlayer(player);
+		
+		// check if tower is same lane as laner
+		boolean topTurret = player.role.equals("top") && lane.equals("TOP_LANE");
+		boolean midTurret = player.role.equals("mid") && lane.equals("MID_LANE");
+		boolean botTurret = (player.role.equals("bot") || player.role.equals("supp")) && lane.equals("BOT_LANE");
+		
+		if (topTurret || midTurret || botTurret) {
+			
+			// direct killer of the turret
+			if (killerId == player.pId) {
+				result = "player";
+			} else if (killerId == opponent.pId) {
+				result = "enemy";
+			// got assist on the turret
+			} else {
+				for (int i = 0; i < assists.length(); i++) {
+					int a = assists.getInt(i);
+					if (a == player.pId) {
+						result = "player";
+						break;
+					} else if (a == opponent.pId) {
+						result = "enemy";
+						break;
+					}
+				}
+			}
+		}
+		
+		return result;
+	}
 
 	public static void addPreTwentyStats(JSONObject timeline, Match m, PreTwentyStat pts) throws Exception {
 		
@@ -462,6 +514,10 @@ public class Main {
 		boolean firstDragInGame = false;
 		boolean gotFirstDrag = false;
 		
+		// tower 
+		boolean firstTower = false;
+		boolean opponentGotTower = false;
+		
 		
 		// timestamp is based on milliseconds; 20 min = 1,200,000 ms (add half a minute for sake of accuracy)
 		// make sure timestamp begins at ~1min 30 or so to not include early game invades (unrelated to laning)
@@ -469,8 +525,11 @@ public class Main {
 			JSONArray events = frameobj.getJSONArray("events");
 			// check events for a champion kill
 			for (int i = 0; i < events.length(); i++) {
+				
 				JSONObject event = events.getJSONObject(i);
-				if (event.getString("type").equals("CHAMPION_KILL")) {
+				String type = event.getString("type");
+				
+				if (type.equals("CHAMPION_KILL")) {
 					
 					
 					// kill participants (kill, assist, death)
@@ -499,7 +558,6 @@ public class Main {
 					// increase appropriate lane counter
 					if (g == 1) {
 						numTopGanks++;
-						System.out.println(event.getLong("timestamp"));
 					} else if (g == 2) {
 						numMidGanks++;
 					} else if (g == 3) {
@@ -511,7 +569,7 @@ public class Main {
 				
 				// only need to check this if player is a jungler
 				if (player.role.equals("jungle")) {
-					if (event.getString("type").equals("ELITE_MONSTER_KILL")) {
+					if (type.equals("ELITE_MONSTER_KILL")) {
 						
 						String monsterType = event.getString("monsterType"); 
 						int killerId = event.getInt("killerId");
@@ -531,6 +589,25 @@ public class Main {
 							firstDragInGame = true;
 						}
 					}
+				
+				// only check first tower for laner
+				} else {
+					
+					// building kill occurs, lane both opponent and player have not gotten tower yet, tower destroyed is an outer turret
+					if (type.equals("BUILDING_KILL") && !opponentGotTower && !firstTower && event.getString("towerType").equals("OUTER_TURRET")) {
+						
+						int killerId = event.getInt("killerId");
+						JSONArray assists = event.getJSONArray("assistingParticipantIds");
+						
+						String towerKiller = whoGotFirstTower(m, killerId, assists, event.getString("laneType"));
+						
+						if (towerKiller.equals("player")) {
+							firstTower = true;
+						} else if (towerKiller.equals("enemy")) {
+							opponentGotTower = true;
+						} 
+						// if neither than not a relevant tower kill
+					}
 				}
 				
 			}
@@ -546,7 +623,7 @@ public class Main {
 			
 		}
 		
-		pts.add(numSoloKills, numSoloDeaths, numTopGanks, numMidGanks, numBotGanks, dragon, gotFirstDrag, riftHerald, firstRift);
+		pts.add(numSoloKills, numSoloDeaths, numTopGanks, numMidGanks, numBotGanks, firstGankTime, firstTower, dragon, gotFirstDrag, riftHerald, firstRift);
 	}
 	
 	// *********************************************************************************************
@@ -593,7 +670,7 @@ public class Main {
 //	}
 	
 	public static void main(String[] args) throws Exception{
-		int champNum = 102; //69 cass 157 yasuo 102 shyvana
+		int champNum = 83; //69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick
 		
 		BigInteger bi = new BigInteger("2547914630");
 		JSONObject matchobj = getMatchById(bi);
@@ -601,20 +678,15 @@ public class Main {
 		Match m = createPlayers(matchobj, champNum);
 		StandardStat ss = new StandardStat();
 		
-//		addStandard(matchobj, m, ss);
-//		ss.printLast();
+		addStandard(matchobj, m, ss);
+		ss.printLast();
 		
 		
 		JSONObject t = getTimeline(bi);
 		PreTwentyStat pts = new PreTwentyStat();
 		addPreTwentyStats(t, m, pts);
 		pts.printLast();
-		
 
-//		
-//		
-//
-//		
 //		Map<String, Integer> x = getParticipantIds(matchobj, champNum);
 //		
 //		Map<String, String> standard = getStandard(matchobj, x.get("player"));
