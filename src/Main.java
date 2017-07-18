@@ -12,7 +12,7 @@ public class Main {
 	static String apiurl = "https://na1.api.riotgames.com/lol/";
 	
 	// key to use the api, may need to reuse (DO NOT use this for final product)
-	static String apiKey = "RGAPI-93e05338-2b87-49eb-bb2b-9e7ca88e0c1d";
+	static String apiKey = "RGAPI-cba79768-a6a4-457e-ae34-2c5d760bb3d6";
 	
 	
 	
@@ -458,23 +458,31 @@ public class Main {
 		
 		if (topTurret || midTurret || botTurret) {
 			
-			// direct killer of the turret
-			if (killerId == player.pId) {
+//			// direct killer of the turret
+//			if (killerId == player.pId) {
+//				result = "player";
+//			} else if (killerId == opponent.pId) {
+//				result = "enemy";
+//			// got assist on the turret
+//			} else {
+//				for (int i = 0; i < assists.length(); i++) {
+//					int a = assists.getInt(i);
+//					if (a == player.pId) {
+//						result = "player";
+//						break;
+//					} else if (a == opponent.pId) {
+//						result = "enemy";
+//						break;
+//					}
+//				}
+//			}
+			
+			// check which team got the first tower
+			Player killer = m.getPlayer(killerId);
+			if (killer.team == player.team) {
 				result = "player";
-			} else if (killerId == opponent.pId) {
+			} else if (killer.team == opponent.team) {
 				result = "enemy";
-			// got assist on the turret
-			} else {
-				for (int i = 0; i < assists.length(); i++) {
-					int a = assists.getInt(i);
-					if (a == player.pId) {
-						result = "player";
-						break;
-					} else if (a == opponent.pId) {
-						result = "enemy";
-						break;
-					}
-				}
 			}
 		}
 		
@@ -501,11 +509,18 @@ public class Main {
 		int numSoloDeaths = 0;
 		
 		// ganks
+		int numMidKills = 0;
+		int numTopKills = 0;
+		int numBotKills = 0;
 		int numMidGanks = 0;
 		int numTopGanks = 0;
 		int numBotGanks = 0;
 		long firstGankTime = 0;
-		boolean ganked = false;
+		boolean ganked = false; // checks for whether or not player has made a successful gank yet
+		String laneOfLastKill = ""; // this is used to help check multiple kill were multiple ganks or not
+		long timeOfLastGank = 0; // time last gank occurred
+		long gankTimeThreshold = 0; // based on above, add 12 seconds; before this time is reached, any additional kills are counted as part of same gank
+		
 		
 		// jungle monsters
 		long riftHerald = 0;
@@ -548,20 +563,52 @@ public class Main {
 					
 					int g = gank(m, killerId, assists, locationx, locationy);
 					
-					// if gank was yours AND successful AND you have not gotten a successful gank before
-					// record the time of the gank
-					if (g != 0 && !ganked) {
-						firstGankTime = event.getLong("timestamp");
-						ganked = true;
+					// if gank was yours AND successful record the time of the gank
+					if (g != 0) {
+						timeOfLastGank = event.getLong("timestamp");
+						
+						// check if this was your first successful gank
+						if (!ganked) {
+							firstGankTime = timeOfLastGank;
+							ganked = true;
+						}
+						
 					}
 					
 					// increase appropriate lane counter
 					if (g == 1) {
-						numTopGanks++;
+						numTopKills++;
+						
+						// check if kill was separate gank based on time; also check based on lane ganked
+						if (timeOfLastGank > gankTimeThreshold || !laneOfLastKill.equals("top")) {
+							numTopGanks++;
+						}
+						
+						gankTimeThreshold = timeOfLastGank + 14000; // 14000 because 14 seconds (10 sec min death timer + extra leeway for tp)
+						laneOfLastKill = "top";
+						
 					} else if (g == 2) {
-						numMidGanks++;
+						numMidKills++;
+						
+						// check if kill was separate gank based on time; also check based on lane ganked
+						if (timeOfLastGank > gankTimeThreshold || !laneOfLastKill.equals("mid")) {
+							numMidGanks++;
+						}
+						
+						gankTimeThreshold = timeOfLastGank + 12000; // 12000 because 12 seconds (10 sec min death timer + extra leeway for tp)
+						laneOfLastKill = "mid";
+						
 					} else if (g == 3) {
-						numBotGanks++;
+						numBotKills++;
+						
+						// check if kill was separate gank based on time; also check based on lane ganked
+						if (timeOfLastGank > gankTimeThreshold || !laneOfLastKill.equals("bot")) {
+							numBotGanks++;
+						}
+						
+						gankTimeThreshold = timeOfLastGank + 12000; // 12000 because 12 seconds (10 sec min death timer + extra leeway for tp)
+						laneOfLastKill = "bot";
+						
 					}
 					
 						
@@ -623,7 +670,7 @@ public class Main {
 			
 		}
 		
-		pts.add(numSoloKills, numSoloDeaths, numTopGanks, numMidGanks, numBotGanks, firstGankTime, firstTower, dragon, gotFirstDrag, riftHerald, firstRift);
+		pts.add(numSoloKills, numSoloDeaths, numTopKills, numMidKills, numBotKills, numTopGanks, numMidGanks, numBotGanks, firstGankTime, firstTower, dragon, gotFirstDrag, riftHerald, firstRift);
 	}
 	
 	// *********************************************************************************************
@@ -637,71 +684,60 @@ public class Main {
 	
 	
 	// find statistics on games as a certain champion on certain role
-//	public static void search(long accountId, int champNum, int season, String role) throws Exception {
-//		
-//		String matchRequest = "https://na1.api.riotgames.com/lol/match/v3/matchlists/"
-//				+ "by-account/" + accountId
-//				+ "?season=" + season 
-//				+ "&champion=" + champNum
-//				+ "&api_key=" + apiKey;
-//		String result = getHTML(matchRequest);
-//		JSONObject obj = new JSONObject(result);
-//		JSONArray matchlist = obj.getJSONArray("matches");
-//		int numMatches = obj.getInt("totalGames");
-//		
-//		// after you get the matchlist, iterate through the matches; only go deeper
-//		// if the role is correct
-//		
-//		for (int i = 0; i < matchlist.length(); i++) {
-//			long matchId = matchlist.getJSONObject(i).getLong("gameId");
-////			JSONObject matchobj = getMatchById(matchId);
-//			
-//			// only use stats for a match if the role is correct
-////			Map<String, Integer> pIds = getParticipantIds(matchobj, champNum);
-////			String pRole = getPlayerRole(pIds);
-////			if (pRole.equals(role)) {
-//				/* run get standard and get pretwenty
-//				 * for every match, add those stats into a specific stats array
-//				 * after you are completed with going through all the matches
-//				 * calculate averages for all the stats and return*/
-////			}
-//		}
-//		
-//	}
+	public static void search(long accountId, int champNum, int season) throws Exception {
+		
+		String matchRequest = "https://na1.api.riotgames.com/lol/match/v3/matchlists/"
+				+ "by-account/" + accountId
+				+ "?season=" + season 
+				+ "&champion=" + champNum
+				+ "&api_key=" + apiKey;
+		String result = getHTML(matchRequest);
+		JSONObject obj = new JSONObject(result);
+		JSONArray matchlist = obj.getJSONArray("matches");
+		int numMatches = obj.getInt("totalGames");
+		
+		// after you get the matchlist, iterate through the matches; only go deeper
+		// if the role is correct
+		
+		StandardStat ss = new StandardStat();
+//		PreTwentyStat pts = new PreTwentyStat();
+		
+		for (int i = 0; i < 10; i++) {
+			long id = matchlist.getJSONObject(i).getLong("gameId");
+			BigInteger matchId = new BigInteger(Long.toString(id));
+			JSONObject matchobj = getMatchById(matchId);
+			
+			Match m = createPlayers(matchobj, champNum);
+			
+			addStandard(matchobj, m, ss);
+			
+//			JSONObject t = getTimeline(matchId);
+//			addPreTwentyStats(t, m, pts);
+		}
+		
+		AvgStandardStat ass = ss.findAverage();
+		ass.print();
+		
+	}
 	
 	public static void main(String[] args) throws Exception{
-		int champNum = 83; //69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick
-		
-		BigInteger bi = new BigInteger("2547914630");
-		JSONObject matchobj = getMatchById(bi);
-		
-		Match m = createPlayers(matchobj, champNum);
-		StandardStat ss = new StandardStat();
-		
-		addStandard(matchobj, m, ss);
-		ss.printLast();
-		
-		
-		JSONObject t = getTimeline(bi);
-		PreTwentyStat pts = new PreTwentyStat();
-		addPreTwentyStats(t, m, pts);
-		pts.printLast();
-
-//		Map<String, Integer> x = getParticipantIds(matchobj, champNum);
+//		int champNum = 412; // 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
+//		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 
 //		
-//		Map<String, String> standard = getStandard(matchobj, x.get("player"));
+//		BigInteger bi = new BigInteger("2551280470");
+//		JSONObject matchobj = getMatchById(bi);
 //		
-//		for (String k : standard.keySet()) {
-//			System.out.println(k + ": " + standard.get(k));
-//		}
+//		Match m = createPlayers(matchobj, champNum);
+//		StandardStat ss = new StandardStat();
 //		
-//		JSONObject t = getTimeline(sampleMatchNum);
-//		Map<String, Long> y = getPreTwentyStats(t, x);
+//		addStandard(matchobj, m, ss);
+//		ss.printLast();
 //		
 //		
-//		for (String k : y.keySet()) {
-//			System.out.println(k + ": " + y.get(k));
-//		}
-		
+//		JSONObject t = getTimeline(bi);
+//		PreTwentyStat pts = new PreTwentyStat();
+//		addPreTwentyStats(t, m, pts);
+//		pts.printLast();
+		search(218887656, 39, 9);
 	}
 }

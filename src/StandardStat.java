@@ -53,9 +53,8 @@ public class StandardStat {
 		double totalWins = 0;
 		double totalDPM = 0;
 		double totalDP = 0;
-		// add xp and dmgt
-		
-		
+		double totalDT = 0;
+		double totalXP = 0;
 		double totalKP = 0;
 		double totalCSDiff = 0;
 		double totalJgCS = 0;
@@ -66,6 +65,8 @@ public class StandardStat {
 			totalCSmin += csmin.get(i);
 			totalDPM += dmin.get(i);
 			totalDP += dmgP.get(i);
+			totalDT += dmgt20.get(i);
+			totalXP += xpd20.get(i);
 			totalKP += kp.get(i);
 			totalCSDiff += csd20.get(i);
 			totalJgCS += enemyjg.get(i);
@@ -81,11 +82,13 @@ public class StandardStat {
 		double avgWins = totalWins / numGames;
 		double avgDPM = totalDPM / numGames;
 		double avgDP = totalDP / numGames;
+		double avgDT = totalDT / numGames;
+		double avgXP = totalXP / numGames;
 		double avgKP = totalKP / numGames;
 		double avgCSDiff = totalCSDiff / numGames;
 		double avgJgCS = totalJgCS / numGames;
 		
-		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgKP, avgCSDiff, avgJgCS);
+		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgDT, avgXP, avgKP, avgCSDiff, avgJgCS);
 		
 		return ass;
 	}
