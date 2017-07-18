@@ -64,6 +64,51 @@ public class Match {
 		return result;
 	}
 	
+	
+	// return ture if there are no repeat roles (if this is false don't account stats for the match)
+	public boolean validRoles() {
+		
+		boolean top1 = false, top2 = false, jg1 = false, jg2 = false, mid1 = false, mid2 = false, 
+				bot1 = false, bot2 = false, supp1 = false, supp2 = false;
+		
+		for (int i = 0; i < allPlayers.length; i++) {
+			Player p = allPlayers[i];
+			if (p.role.equals("top")) {
+				if (p.team == 100) {
+					top1 = true;
+				} else {
+					top2 = true;
+				}
+			} else if (p.role.equals("jungle")) {
+				if (p.team == 100) {
+					jg1 = true;
+				} else {
+					jg2 = true;
+				}
+			} else if (p.role.equals("mid")) {
+				if (p.team == 100) {
+					mid1 = true;
+				} else {
+					mid2 = true;
+				}
+			} else if (p.role.equals("bot")) {
+				if (p.team == 100) {
+					bot1 = true;
+				} else {
+					bot2 = true;
+				}
+			} else if (p.role.equals("supp")) {
+				if (p.team == 100) {
+					supp1 = true;
+				} else {
+					supp2 = true;
+				}
+			}
+		}
+		
+		return (top1 && top2 && jg1 && jg2 && mid1 && mid2 && bot1 && bot2 && supp1 && supp2);
+	}
+	
 	public void printMain() {
 		System.out.println("id: " + player.pId + " role: " + player.role + " team: " + player.team);
 	}

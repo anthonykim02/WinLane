@@ -75,6 +75,7 @@ public class Main {
 				+ "?api_key=" + apiKey;
 		
 		String match = getHTML(link);
+		System.out.println(match);
 		return new JSONObject(match);
 	}
 	
@@ -162,16 +163,6 @@ public class Main {
 		int assists = stats.getInt("assists");
 		int deaths = stats.getInt("deaths");
 		
-		double kda = 0;
-		if (deaths == 0) {
-			kda = 999.0;
-		} else {
-			kda = (double) (kills + assists) / (double) deaths;
-			kda = kda * 100;
-			kda = Math.round(kda);
-			kda = kda / 100;
-		}
-		
 		// ***KILL PARTICIPATION***
 		// first get total kill/dmg values for entire team (damage used for later)
 		int totalKills = 0;
@@ -194,16 +185,18 @@ public class Main {
 		
 		
 		//*** CSD@20***
-		JSONObject csd = timeline.getJSONObject("csDiffPerMinDeltas");
-		double csd10 = csd.getDouble("0-10") * 10;
-		double csd20 = csd.getDouble("10-20") * 10;
-		double csDiff = csd10 + csd20;
+//		JSONObject csd = timeline.getJSONObject("csDiffPerMinDeltas");
+//		double csd10 = csd.getDouble("0-10") * 10;
+//		double csd20 = csd.getDouble("10-20") * 10;
+//		double csDiff = csd10 + csd20;
+		double csDiff = 0;
 		
 		//***XPD@20***
-		JSONObject xpd = timeline.getJSONObject("xpDiffPerMinDeltas");
-		double xpd10 = xpd.getDouble("0-10") * 10;
-		double xpd20 = xpd.getDouble("10-20") * 10;
-		double xpDiff = xpd10 + xpd20;
+//		JSONObject xpd = timeline.getJSONObject("xpDiffPerMinDeltas");
+//		double xpd10 = xpd.getDouble("0-10") * 10;
+//		double xpd20 = xpd.getDouble("10-20") * 10;
+//		double xpDiff = xpd10 + xpd20;
+		double xpDiff = 0;
 		
 		// ***DAMAGE/MIN***
 		long dmg = stats.getLong("totalDamageDealtToChampions");
@@ -213,17 +206,18 @@ public class Main {
 		double dp = (double) dmg / (double) totalDamage;
 		
 		// ***DAMAGE TAKEN @20***
-		JSONObject dmgt = timeline.getJSONObject("damageTakenPerMinDeltas");
-		double dmgt10 = dmgt.getDouble("0-10") * 10;
-		double dmgt20 = dmgt.getDouble("10-20") * 10;
-		double dmgTaken = dmgt10 + dmgt20;
+//		JSONObject dmgt = timeline.getJSONObject("damageTakenPerMinDeltas");
+//		double dmgt10 = dmgt.getDouble("0-10") * 10;
+//		double dmgt20 = dmgt.getDouble("10-20") * 10;
+//		double dmgTaken = dmgt10 + dmgt20;
+		double dmgTaken = 0;
 		
 		// ***ENEMY JG CS***
 		int enemyjg = stats.getInt("neutralMinionsKilledEnemyJungle");
 		
 		
 		// add to list of standard stats for that champion
-		ss.add(kda, cspm, wl, dpm, dp, dmgTaken, xpDiff, kp, csDiff, enemyjg);
+		ss.add(kills, deaths, assists, cspm, wl, dpm, dp, dmgTaken, xpDiff, kp, csDiff, enemyjg);
 	}
 	
 	// *********************************************************************************************
@@ -444,12 +438,11 @@ public class Main {
 		return wasGank;
 	}
 	
-	public static String whoGotFirstTower(Match m, int killerId, JSONArray assists, String lane) throws Exception{
+	public static String whoGotFirstTower(Match m, int teamId, String lane) throws Exception{
 		
 		String result = "";
 		
 		Player player = m.getMainPlayer();
-		Player opponent = m.getOppositePlayer(player);
 		
 		// check if tower is same lane as laner
 		boolean topTurret = player.role.equals("top") && lane.equals("TOP_LANE");
@@ -458,30 +451,10 @@ public class Main {
 		
 		if (topTurret || midTurret || botTurret) {
 			
-//			// direct killer of the turret
-//			if (killerId == player.pId) {
-//				result = "player";
-//			} else if (killerId == opponent.pId) {
-//				result = "enemy";
-//			// got assist on the turret
-//			} else {
-//				for (int i = 0; i < assists.length(); i++) {
-//					int a = assists.getInt(i);
-//					if (a == player.pId) {
-//						result = "player";
-//						break;
-//					} else if (a == opponent.pId) {
-//						result = "enemy";
-//						break;
-//					}
-//				}
-//			}
-			
 			// check which team got the first tower
-			Player killer = m.getPlayer(killerId);
-			if (killer.team == player.team) {
+			if (teamId != player.team) {
 				result = "player";
-			} else if (killer.team == opponent.team) {
+			} else {
 				result = "enemy";
 			}
 		}
@@ -556,7 +529,7 @@ public class Main {
 					JSONObject position = event.getJSONObject("position");
 					int locationx = position.getInt("x");
 					int locationy = position.getInt("y");
-							
+					
 					int[] kd = soloKill(m, killerId, victimId, assists, locationx, locationy);
 					numSoloKills += kd[0];
 					numSoloDeaths += kd[1];
@@ -645,8 +618,9 @@ public class Main {
 						
 						int killerId = event.getInt("killerId");
 						JSONArray assists = event.getJSONArray("assistingParticipantIds");
+						int towerTeam = event.getInt("teamId");
 						
-						String towerKiller = whoGotFirstTower(m, killerId, assists, event.getString("laneType"));
+						String towerKiller = whoGotFirstTower(m, towerTeam, event.getString("laneType"));
 						
 						if (towerKiller.equals("player")) {
 							firstTower = true;
@@ -688,40 +662,59 @@ public class Main {
 		
 		String matchRequest = "https://na1.api.riotgames.com/lol/match/v3/matchlists/"
 				+ "by-account/" + accountId
-				+ "?season=" + season 
+				+ "?queue=420"	// 420 is the queueid for solo queue
+				+ "&season=" + season 
 				+ "&champion=" + champNum
 				+ "&api_key=" + apiKey;
 		String result = getHTML(matchRequest);
 		JSONObject obj = new JSONObject(result);
 		JSONArray matchlist = obj.getJSONArray("matches");
 		int numMatches = obj.getInt("totalGames");
+		System.out.println(numMatches);
 		
 		// after you get the matchlist, iterate through the matches; only go deeper
 		// if the role is correct
 		
 		StandardStat ss = new StandardStat();
-//		PreTwentyStat pts = new PreTwentyStat();
+		PreTwentyStat pts = new PreTwentyStat();
 		
-		for (int i = 0; i < 10; i++) {
+		int matchesToCheck = 15;
+		
+		// possibility of having less than 10 solo queue games on a champion
+		if (matchesToCheck > numMatches) {
+			matchesToCheck = numMatches;
+		}
+		
+		for (int i = 0; i < matchesToCheck; i++) {
 			long id = matchlist.getJSONObject(i).getLong("gameId");
 			BigInteger matchId = new BigInteger(Long.toString(id));
 			JSONObject matchobj = getMatchById(matchId);
 			
 			Match m = createPlayers(matchobj, champNum);
 			
-			addStandard(matchobj, m, ss);
+			if (m.validRoles()) {
+				addStandard(matchobj, m, ss);
+				
+				JSONObject t = getTimeline(matchId);
+				addPreTwentyStats(t, m, pts);
+				
+			//skip if roles are not assigned properly; make sure not to keep trying to fill 10 games if there are less matches
+			} else if (numMatches != matchesToCheck) {
+				matchesToCheck++;
+			}
 			
-//			JSONObject t = getTimeline(matchId);
-//			addPreTwentyStats(t, m, pts);
 		}
 		
 		AvgStandardStat ass = ss.findAverage();
 		ass.print();
 		
+		AvgPreTwentyStat apts = pts.findAverage();
+		apts.print();
+		
 	}
 	
 	public static void main(String[] args) throws Exception{
-//		int champNum = 412; // 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
+//		int champNum = 39; // 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
 //		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 
 //		
 //		BigInteger bi = new BigInteger("2551280470");
@@ -738,6 +731,14 @@ public class Main {
 //		PreTwentyStat pts = new PreTwentyStat();
 //		addPreTwentyStats(t, m, pts);
 //		pts.printLast();
-		search(218887656, 39, 9);
+		
+		
+//		search(218887656, 45, 9); // anthony 59 jarvan 45 veigar 36 mundo 
+		search(219253169, 157, 9); // andrew 18 trist
+//		search(216255780, 63, 9); // david 63 brand
+//		search(219224164, 432, 9); // kevin 432 bard
+		search(41236595, 76, 9); // edar 64 lee sin 2 olaf 76 nidalee
+		
+		
 	}
 }
