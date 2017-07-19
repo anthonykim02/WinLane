@@ -12,7 +12,7 @@ public class Main {
 	static String apiurl = "https://na1.api.riotgames.com/lol/";
 	
 	// key to use the api, may need to reuse (DO NOT use this for final product)
-	static String apiKey = "RGAPI-cba79768-a6a4-457e-ae34-2c5d760bb3d6";
+	static String apiKey = "RGAPI-6d39696c-ee69-48be-84e9-0a5a42ec3b42";
 	
 	
 	
@@ -183,21 +183,6 @@ public class Main {
 		int totalcs = stats.getInt("totalMinionsKilled") + stats.getInt("neutralMinionsKilled");
 		double cspm = (double) totalcs / minutes;
 		
-		
-		//*** CSD@20***
-//		JSONObject csd = timeline.getJSONObject("csDiffPerMinDeltas");
-//		double csd10 = csd.getDouble("0-10") * 10;
-//		double csd20 = csd.getDouble("10-20") * 10;
-//		double csDiff = csd10 + csd20;
-		double csDiff = 0;
-		
-		//***XPD@20***
-//		JSONObject xpd = timeline.getJSONObject("xpDiffPerMinDeltas");
-//		double xpd10 = xpd.getDouble("0-10") * 10;
-//		double xpd20 = xpd.getDouble("10-20") * 10;
-//		double xpDiff = xpd10 + xpd20;
-		double xpDiff = 0;
-		
 		// ***DAMAGE/MIN***
 		long dmg = stats.getLong("totalDamageDealtToChampions");
 		double dpm = (double) dmg / minutes;
@@ -205,19 +190,12 @@ public class Main {
 		// ***DAMAGE %***
 		double dp = (double) dmg / (double) totalDamage;
 		
-		// ***DAMAGE TAKEN @20***
-//		JSONObject dmgt = timeline.getJSONObject("damageTakenPerMinDeltas");
-//		double dmgt10 = dmgt.getDouble("0-10") * 10;
-//		double dmgt20 = dmgt.getDouble("10-20") * 10;
-//		double dmgTaken = dmgt10 + dmgt20;
-		double dmgTaken = 0;
-		
 		// ***ENEMY JG CS***
 		int enemyjg = stats.getInt("neutralMinionsKilledEnemyJungle");
 		
 		
 		// add to list of standard stats for that champion
-		ss.add(kills, deaths, assists, cspm, wl, dpm, dp, dmgTaken, xpDiff, kp, csDiff, enemyjg);
+		ss.add(kills, deaths, assists, cspm, wl, dpm, dp, kp, enemyjg);
 	}
 	
 	// *********************************************************************************************
@@ -267,6 +245,7 @@ public class Main {
 				+ "match/v3/timelines/by-match/" + matchId
 				+ "?api_key=" + apiKey;
 		String timeline = getHTML(link);
+		System.out.println(timeline);
 		return new JSONObject(timeline);
 	}
 
@@ -481,6 +460,11 @@ public class Main {
 		int numSoloKills = 0;
 		int numSoloDeaths = 0;
 		
+		// @20 stats
+		int csDiff = 0;
+		int xpDiff = 0;
+		int goldDiff = 0;
+		
 		// ganks
 		int numMidKills = 0;
 		int numTopKills = 0;
@@ -632,19 +616,65 @@ public class Main {
 				}
 				
 			}
-			index++;
 			
+			
+			// specific check for 20 minute mark to check for diff @20 stats (will only happen once)
+			if (timestamp >= 120000) {
+				JSONObject participantFrames = frameobj.getJSONObject("participantFrames");
+				
+				// player's stats
+				JSONObject playerFrame = participantFrames.getJSONObject(Integer.toString(player.pId));
+				int playerCS = playerFrame.getInt("minionsKilled");
+				int playerXP = playerFrame.getInt("xp");
+				int playerGold = playerFrame.getInt("totalGold");
+				
+				// opponent's stats
+				Player opp = m.getOppositePlayer(player);
+				JSONObject oppFrame = participantFrames.getJSONObject(Integer.toString(opp.pId));
+				int oppCS = oppFrame.getInt("minionsKilled");
+				int oppXP = oppFrame.getInt("xp");
+				int oppGold = oppFrame.getInt("totalGold");
+				
+				csDiff = playerCS - oppCS;
+				xpDiff = playerXP - oppXP;
+				goldDiff = playerGold - oppGold;
+			}
+			
+			index++;
 			// some games may not go to 20 minutes
 			if (index < numFrames) {
 				frameobj = frames.getJSONObject(index);
 				timestamp = frameobj.getLong("timestamp");
+			
+			// in the case where game ends before 20 minutes, just get the latest difference values
 			} else {
+				
+				// same code as above when getting difference stats, only difference is that the assumption is the time is 15-20 min
+				JSONObject participantFrames = frameobj.getJSONObject("participantFrames");
+				
+				// player's stats
+				JSONObject playerFrame = participantFrames.getJSONObject(Integer.toString(player.pId));
+				int playerCS = playerFrame.getInt("minionsKilled");
+				int playerXP = playerFrame.getInt("xp");
+				int playerGold = playerFrame.getInt("totalGold");
+				
+				// opponent's stats
+				Player opp = m.getOppositePlayer(player);
+				JSONObject oppFrame = participantFrames.getJSONObject(Integer.toString(opp.pId));
+				int oppCS = oppFrame.getInt("minionsKilled");
+				int oppXP = oppFrame.getInt("xp");
+				int oppGold = oppFrame.getInt("totalGold");
+				
+				csDiff = playerCS - oppCS;
+				xpDiff = playerXP - oppXP;
+				goldDiff = playerGold - oppGold;
+				
 				timestamp = 1230000;
 			}
 			
 		}
 		
-		pts.add(numSoloKills, numSoloDeaths, numTopKills, numMidKills, numBotKills, numTopGanks, numMidGanks, numBotGanks, firstGankTime, firstTower, dragon, gotFirstDrag, riftHerald, firstRift);
+		pts.add(numSoloKills, numSoloDeaths, csDiff, xpDiff, goldDiff, numTopKills, numMidKills, numBotKills, numTopGanks, numMidGanks, numBotGanks, firstGankTime, firstTower, dragon, gotFirstDrag, riftHerald, firstRift);
 	}
 	
 	// *********************************************************************************************
@@ -678,7 +708,7 @@ public class Main {
 		StandardStat ss = new StandardStat();
 		PreTwentyStat pts = new PreTwentyStat();
 		
-		int matchesToCheck = 15;
+		int matchesToCheck = 20;
 		
 		// possibility of having less than 10 solo queue games on a champion
 		if (matchesToCheck > numMatches) {
@@ -689,10 +719,12 @@ public class Main {
 			long id = matchlist.getJSONObject(i).getLong("gameId");
 			BigInteger matchId = new BigInteger(Long.toString(id));
 			JSONObject matchobj = getMatchById(matchId);
+			int matchDuration = matchobj.getInt("gameDuration");
 			
 			Match m = createPlayers(matchobj, champNum);
 			
-			if (m.validRoles()) {
+			// check for valid roles and match duration of at least 15
+			if (m.validRoles() && matchDuration >= 900) {
 				addStandard(matchobj, m, ss);
 				
 				JSONObject t = getTimeline(matchId);
@@ -705,39 +737,54 @@ public class Main {
 			
 		}
 		
-		AvgStandardStat ass = ss.findAverage();
-		ass.print();
+//		AvgStandardStat ass = ss.findAverage();
+//		ass.print();
+//		
+//		AvgPreTwentyStat apts = pts.findAverage();
+//		apts.print();
 		
-		AvgPreTwentyStat apts = pts.findAverage();
-		apts.print();
+		// @DAVID
+		// THE NUMBER WITHIN THE PARAMETER IS THE GAME NUMBER (SEE #2 OF THE INSTRUCTIONS
+		ss.printGameStandard(1);
+		pts.printGamePreTwenty(1);
 		
 	}
 	
-	public static void main(String[] args) throws Exception{
-//		int champNum = 39; // 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
-//		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 
-//		
-//		BigInteger bi = new BigInteger("2551280470");
-//		JSONObject matchobj = getMatchById(bi);
-//		
-//		Match m = createPlayers(matchobj, champNum);
-//		StandardStat ss = new StandardStat();
-//		
-//		addStandard(matchobj, m, ss);
-//		ss.printLast();
-//		
-//		
-//		JSONObject t = getTimeline(bi);
-//		PreTwentyStat pts = new PreTwentyStat();
-//		addPreTwentyStats(t, m, pts);
-//		pts.printLast();
+	public static void main(String[] args) throws Exception{		
 		
+		/*
+		 *  FOR DAVID: TESTING INSTRUCTIONS:
+		 *  DON'T MIND THE CODE ABOVE, JUST STICK TO THIS PART OF THE MAIN FUNCTION
+		 *  1. LOOK UP SOME GAMES (5 GAMES WOULD BE ENOUGH) ON OP.GG FOR A CERTAIN CHAMPION YOU PLAY, MAKE SURE THESE ARE SOLO QUEUE GAMES
+		 *  2. FIND HOW RECENT IT IS AND USE THAT NUMBER AS THE PARAMETER OF THE TWO PRINTGAME FUNCTIONS
+		 *  	FOR EX: MOST RECENT GAME IS #1, NEXT RECENT IS #2 AND SO ON..
+		 *  	YOU CAN FIND THE CALLS OF THE PRINTGAME FUNCTION WITHIN THE FUNCTION TITLED "SEARCH" WHICH IS RIGHT ABOVE THE MAIN (I COMMENTED @DAVID ABOVE IT)
+		 *  3. ON THE VERY BOTTOM OF THIS FUNCTION (MAIN) YOU FIND THE SEARCH FUNCTION CALL. CHANGE THE PARAMETERS BASED ON THE GAME YOU'RE LOOKING UP
+		 *  4. LOOK AT RESULTS AND COMPARE IT WITH THE ACTUAL GAME RESULTS (YOU WILL HAVE TO WATCH THE GAME REPLAY TO MAKE SURE THE STATS WORK)
+		 *  5. IF ANY STAT IS WRONG, OR ANYTHING IS CONFUSING, OR THE CODE CRASHES (LAST ONE IS ESPECIALLY IMPORTANT) TAKE NOT OF IT AND CONTINUE WORKING
+		 *  6. POST ON THE GROUP CHAT WITH THE RESULTS AFTER ALL THE TESTING IN COMPLETE
+		 *  
+		 *  
+		 *  THERE WILL BE MORE COMMENTS BELOW TO HELP YOU 
+		 */
 		
-//		search(218887656, 45, 9); // anthony 59 jarvan 45 veigar 36 mundo 
-		search(219253169, 157, 9); // andrew 18 trist
-//		search(216255780, 63, 9); // david 63 brand
-//		search(219224164, 432, 9); // kevin 432 bard
-		search(41236595, 76, 9); // edar 64 lee sin 2 olaf 76 nidalee
+		// SOME CHAMP NUMS:
+		// 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
+		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 
+		// 59 jarvan 45 veigar 36 mundo 18 trist 63 brand
+		//64 lee sin 2 olaf 76 nidalee 412 thresh
+		
+		// SOME ACCOUNT IDS:
+		// 218887656 anthony
+		// 219253169 andrew
+		// 216255780 david
+		// 219224164 kevin 
+		// 41236595 edar
+		
+		// RUN SEARCH FUNCTION
+		// PARAMETERS: ACCOUNTID, CHAMP NUM, SEASON
+		// SEASON SHOULD ALWAYS BE ON 9, BUT REST YOU SHOULD CHANGE BASED ON WHAT YOU'RE LOOKING FOR
+		search(218887656, 39, 9);
 		
 		
 	}

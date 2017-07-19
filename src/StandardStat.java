@@ -10,10 +10,7 @@ public class StandardStat {
 	LinkedList<Boolean> winOrLoss;
 	LinkedList<Double> dmin;
 	LinkedList<Double> dmgP;
-	LinkedList<Double> dmgt20;
-	LinkedList<Double> xpd20;
 	LinkedList<Double> kp;
-	LinkedList<Double> csd20;
 	LinkedList<Integer> enemyjg;
 	
 //	double dminDiff;
@@ -26,15 +23,12 @@ public class StandardStat {
 		winOrLoss = new LinkedList();
 		dmin = new LinkedList();
 		dmgP = new LinkedList();
-		dmgt20 = new LinkedList();
-		xpd20 = new LinkedList();
 		kp = new LinkedList();
-		csd20 = new LinkedList();
 		enemyjg = new LinkedList();
 	}
 	
-	public void add(int killVal, int deathVal, int assistVal, double csminVal, boolean wlVal, double dminVal, double dmgPval, 
-			double dmgtVal, double xpdVal, double kpVal, double csd20Val, int enemyjgVal) {
+	public void add(int killVal, int deathVal, int assistVal, double csminVal, boolean wlVal, 
+			double dminVal, double dmgPval, double kpVal, int enemyjgVal) {
 		kills.add(killVal);
 		deaths.add(deathVal);
 		assists.add(assistVal);
@@ -42,10 +36,7 @@ public class StandardStat {
 		winOrLoss.add(wlVal);
 		dmin.add(dminVal);
 		dmgP.add(dmgPval);
-		dmgt20.add(dmgtVal);
-		xpd20.add(xpdVal);
 		kp.add(kpVal);
-		csd20.add(csd20Val);
 		enemyjg.add(enemyjgVal);
 	}
 
@@ -61,10 +52,7 @@ public class StandardStat {
 		double totalWins = 0;
 		double totalDPM = 0;
 		double totalDP = 0;
-		double totalDT = 0;
-		double totalXP = 0;
 		double totalKP = 0;
-		double totalCSDiff = 0;
 		double totalJgCS = 0;
 		
 		// get stat totals
@@ -75,10 +63,7 @@ public class StandardStat {
 			totalCSmin += csmin.get(i);
 			totalDPM += dmin.get(i);
 			totalDP += dmgP.get(i);
-			totalDT += dmgt20.get(i);
-			totalXP += xpd20.get(i);
 			totalKP += kp.get(i);
-			totalCSDiff += csd20.get(i);
 			totalJgCS += enemyjg.get(i);
 			
 			if (winOrLoss.get(i)) {
@@ -92,15 +77,29 @@ public class StandardStat {
 		double avgWins = totalWins / numGames;
 		double avgDPM = totalDPM / numGames;
 		double avgDP = totalDP / numGames;
-		double avgDT = totalDT / numGames;
-		double avgXP = totalXP / numGames;
 		double avgKP = totalKP / numGames;
-		double avgCSDiff = totalCSDiff / numGames;
 		double avgJgCS = totalJgCS / numGames;
 		
-		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgDT, avgXP, avgKP, avgCSDiff, avgJgCS);
+		ass = new AvgStandardStat(avgKda, avgCSmin, avgWins, avgDPM, avgDP, avgKP, avgJgCS);
 		
 		return ass;
+	}
+	
+	// use this as a test function, parameter is order it appears on op.gg
+	public void printGameStandard(int gameNum) {
+		if (gameNum > kills.size() || gameNum <= 0) {
+			System.out.println("Game Num is either too small or large");
+		} else {
+			System.out.println("Kills: " + kills.get(gameNum - 1));
+			System.out.println("Deaths: " + deaths.get(gameNum - 1));
+			System.out.println("Assists: " + assists.get(gameNum - 1));
+			System.out.println("CS/min: " + csmin.get(gameNum - 1));
+			System.out.println("Win Or Loss: " + winOrLoss.get(gameNum - 1));
+			System.out.println("DMG/min: " + dmin.get(gameNum - 1));
+			System.out.println("DMG%: " + dmgP.get(gameNum - 1));
+			System.out.println("KP: " + kp.get(gameNum - 1));
+			System.out.println("EnemyJG CS: " + enemyjg.get(gameNum - 1));
+		}
 	}
 	
 	public void printLast() {
@@ -111,10 +110,7 @@ public class StandardStat {
 		System.out.println("Win Or Loss: " + winOrLoss.getLast());
 		System.out.println("DMG/min: " + dmin.getLast());
 		System.out.println("DMG%: " + dmgP.getLast());
-		System.out.println("DMGtaken @20: " + dmgt20.getLast());
-		System.out.println("XPdiff @20: " + xpd20.getLast());
 		System.out.println("KP: " + kp.getLast());
-		System.out.println("CSdiff @20: " + csd20.getLast());
 		System.out.println("EnemyJG CS: " + enemyjg.getLast());
 	}
 }

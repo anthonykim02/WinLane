@@ -3,6 +3,9 @@
 public class AvgPreTwentyStat {
 	double sk;
 	double sd;
+	double csd;
+	double xpd;
+	double gd;
 	double topk;
 	double midk;
 	double botk;
@@ -16,10 +19,13 @@ public class AvgPreTwentyStat {
 	double rift;
 	double firstr;
 	
-	public AvgPreTwentyStat(double sk, double sd, double topk, double midk, double botk, double topg, double midg, 
-			double botg, double firstg, double firstt, double drag, double firstd, double rift, double firstr) {
+	public AvgPreTwentyStat(double sk, double sd, double csd, double xpd, double gd, double topk, double midk, double botk, double topg, 
+			double midg, double botg, double firstg, double firstt, double drag, double firstd, double rift, double firstr) {
 		this.sk = sk;
 		this.sd = sd;
+		this.csd = csd;
+		this.xpd = xpd;
+		this.gd = gd;
 		this.topk = topk;
 		this.midk = midk;
 		this.botk = botk; 
@@ -37,6 +43,9 @@ public class AvgPreTwentyStat {
 	public void print() {
 		System.out.println("Avg Solo Kills: " + sk);
 		System.out.println("Avg Solo Deaths: " + sd);
+		System.out.println("Avg CS Diff: " + csd);
+		System.out.println("Avg XP Diff: " + xpd);
+		System.out.println("Avg Gold Diff: " + gd);
 		System.out.println("Avg Kills Contributed off Top Ganks: " + topk);
 		System.out.println("Avg Kills Contributed off Mid Ganks: " + midk);
 		System.out.println("Avg Kills Contributed off Bot Ganks: " + botk);
