@@ -69,6 +69,7 @@ public class PreTwentyStat {
 		// these are used so the 0's from games without getting these objectives doesn't skew the avg
 		int gamesWithFirstDrag = 0;
 		int gamesWithRift = 0;
+		int gamesWithGank = 0;
 		
 		double totalSK = 0;
 		double totalSD = 0;
@@ -102,12 +103,12 @@ public class PreTwentyStat {
 			totalTopG += topgank.get(i);
 			totalMidG += midgank.get(i);
 			totalBotG += botgank.get(i);
-			totalFirstG += firstgank.get(i);
 			
 			
-			// rift and drag times
+			// rift and drag and gank times
 			long d = drag.get(i);
 			long r = rift.get(i);
+			long g = firstgank.get(i);
 			
 			if (d != 0) {
 				gamesWithFirstDrag++;
@@ -115,9 +116,13 @@ public class PreTwentyStat {
 			if (r != 0) {
 				gamesWithRift++;
 			}
+			if (g != 0) {
+				gamesWithGank++;
+			}
 			
 			totalDrag += d;
 			totalRift += r;
+			totalFirstG += g;
 			
 			
 			// percentages
@@ -146,7 +151,7 @@ public class PreTwentyStat {
 		double avgTopG = totalTopG / numGames;
 		double avgMidG = totalMidG / numGames;
 		double avgBotG = totalBotG / numGames;
-		double avgFirstG = totalFirstG / numGames;
+		double avgFirstG = totalFirstG / gamesWithGank;
 		double avgFirstT = totalFirstT / numGames;
 		double avgDrag = totalDrag / gamesWithFirstDrag;
 		double avgFirstD = totalFirstD / numGames;
@@ -158,6 +163,10 @@ public class PreTwentyStat {
 				avgMidG, avgBotG, avgFirstG, avgFirstT, avgDrag, avgFirstD, avgRift, avgFirstR);
 		
 		return apts;
+	}
+	
+	public int size() {
+		return solokill.size();
 	}
 	
 	public void printGamePreTwenty(int gameNum) {

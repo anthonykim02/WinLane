@@ -85,6 +85,9 @@ public class StandardStat {
 		return ass;
 	}
 	
+	public int size() {
+		return kills.size();
+	}
 	// use this as a test function, parameter is order it appears on op.gg
 	public void printGameStandard(int gameNum) {
 		if (gameNum > kills.size() || gameNum <= 0) {

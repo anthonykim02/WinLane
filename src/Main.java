@@ -12,8 +12,8 @@ public class Main {
 	static String apiurl = "https://na1.api.riotgames.com/lol/";
 	
 	// key to use the api, may need to reuse (DO NOT use this for final product)
-	static String apiKey = "RGAPI-6d39696c-ee69-48be-84e9-0a5a42ec3b42";
-	
+	static String apiKey = "RGAPI-af6a6d9c-d63d-48a9-8695-1f4c6fb96b7b";
+	// RGAPI-161880ad-27ce-495d-9a63-ce2e5c2ea6e6
 	
 	
 	// ***LANE COORDINATES FOR EACH RECTANGLE***
@@ -28,7 +28,7 @@ public class Main {
 	static locationCalculator redTopExtend = new locationCalculator(0, 14881, 8600, 14881, 0, 13100, 8600, 13100);
 	
 	// mid
-	static locationCalculator mid = new locationCalculator(9200, 11400, 11400, 9200, 3400, 5600, 5600, 3400);
+	static locationCalculator mid = new locationCalculator(6769, 9909, 9739, 6939, 4930, 8070, 7900, 5100);
 	
 	// blue side bot (two)
 	static locationCalculator blueBotMain = new locationCalculator(9650, 3850, 14820, 3850, 9650, 0, 14820, 0);
@@ -75,8 +75,17 @@ public class Main {
 				+ "?api_key=" + apiKey;
 		
 		String match = getHTML(link);
-		System.out.println(match);
 		return new JSONObject(match);
+	}
+	
+	public static String getSpellById(int id) throws Exception {
+		String link = "https://na1.api.riotgames.com/lol/static-data/v3/"
+				+ "summoner-spells/" + id
+				+ "?api_key=" + apiKey;
+		String html = getHTML(link);
+		JSONObject obj = new JSONObject(html);
+		String spell = obj.getString("name");
+		return spell;
 	}
 	
 	
@@ -86,6 +95,8 @@ public class Main {
 		JSONArray participants = obj.getJSONArray("participants");
 		
 		Player[] allPlayers = new Player[10];
+		String[] spell1 = new String[10];
+		String[] spell2 = new String[10];
 		int playerTeam = 0;
 		
 		for (int i=0; i < 10; i++) {
@@ -94,6 +105,16 @@ public class Main {
 			int teamId = participant.getInt("teamId");
 			int pId = participant.getInt("participantId");
 			int championId = participant.getInt("championId");
+			
+			int sId1 = participant.getInt("spell1Id");
+			int sId2 = participant.getInt("spell2Id");
+			String s1 = getSpellById(sId1);
+			String s2 = getSpellById(sId2);
+			spell1[i] = s1;
+			spell2[i] = s2;
+			System.out.println(s1);
+			System.out.println(s2);
+			
 			
 			// roles: SOLO, NONE, DUO_CARRY, DUO_SUPPORT
 			// lanes: TOP, JUNGLE, MIDDLE, BOTTOM
@@ -104,14 +125,44 @@ public class Main {
 			// single string that represents role (not split into role and lane)
 			String actualRole = "";
 			if (role.equals("DUO_CARRY")) {
-				actualRole = "bot";
+				if (lane.equals("BOTTOM")) {
+					actualRole = "bot";
+				} else if (lane.equals("MIDDLE")) {
+					if (s1.equals("Smite") || s2.equals("Smite")) {
+						actualRole = "jungle";
+					} else if (!s1.equals("Smite") && !s2.equals("Smite")) {
+						actualRole = "mid";
+					}
+				} else if (lane.equals("TOP")) {
+					if (s1.equals("Smite") || s2.equals("Smite")) {
+						actualRole = "jungle";
+					} else if (!s1.equals("Smite") && !s2.equals("Smite")) {
+						actualRole = "top";
+					}
+				}
+				
 			} else if (role.equals("DUO_SUPPORT")) {
-				actualRole = "supp";
+				if (lane.equals("BOTTOM")) {
+					actualRole = "supp";
+				} else if (lane.equals("MIDDLE")) {
+					if (s1.equals("Smite") || s2.equals("Smite")) {
+						actualRole = "jungle";
+					} else if (!s1.equals("Smite") && !s2.equals("Smite")) {
+						actualRole = "mid";
+					}
+				} else if (lane.equals("TOP")) {
+					if (s1.equals("Smite") || s2.equals("Smite")) {
+						actualRole = "jungle";
+					} else if (!s1.equals("Smite") && !s2.equals("Smite")) {
+						actualRole = "top";
+					}
+				}
 			} else if (lane.equals("MIDDLE")) {
 				actualRole = "mid";
 			} else {
 				actualRole = lane.toLowerCase();
 			}
+			System.out.println(lane);
 			
 			// create player object and set its variables
 			Player p = new Player(pId, teamId, actualRole);
@@ -137,7 +188,7 @@ public class Main {
 		}
 		
 		// create match object using player array
-		Match m = new Match(allPlayers);
+		Match m = new Match(allPlayers, spell1, spell2);
 		
 		return m;
 	}
@@ -245,7 +296,6 @@ public class Main {
 				+ "match/v3/timelines/by-match/" + matchId
 				+ "?api_key=" + apiKey;
 		String timeline = getHTML(link);
-		System.out.println(timeline);
 		return new JSONObject(timeline);
 	}
 
@@ -460,7 +510,7 @@ public class Main {
 		int numSoloKills = 0;
 		int numSoloDeaths = 0;
 		
-		// @20 stats
+		// @15 stats
 		int csDiff = 0;
 		int xpDiff = 0;
 		int goldDiff = 0;
@@ -618,8 +668,8 @@ public class Main {
 			}
 			
 			
-			// specific check for 20 minute mark to check for diff @20 stats (will only happen once)
-			if (timestamp >= 120000) {
+			// specific check for 15 minute mark to check for diff @15 stats (will only happen once)
+			if (timestamp >= 900000 && timestamp < 930000) {
 				JSONObject participantFrames = frameobj.getJSONObject("participantFrames");
 				
 				// player's stats
@@ -682,24 +732,57 @@ public class Main {
 	// ********************************************************************************************
 	
 	// use result of this function as parameters to search function
-	public static void getCurrentGame() {
+	// takes summoner name, get parameters to search and then runs search
+	public static CurrentGame getCurrentGame(String summonerName) throws Exception {
+		
+		// get rid of spaces and replace with %20
+		
+		
+		// get id of summoner
+		String idRequest = "https://na1.api.riotgames.com/lol/summoner/v3/summoners/"
+				+ "by-name/" + summonerName
+				+ "?api_key=" + apiKey;
+		String s = getHTML(idRequest);
+		JSONObject sobj = new JSONObject(s);
+		long playerId = sobj.getLong("id");
+		
+		// use id to get current game
+		String gameRequest = "https://na1.api.riotgames.com/lol/spectator/v3/active-games/by-summoner/"
+				+ playerId
+				+ "?api_key=" + apiKey;
+		String g = getHTML(gameRequest);
+		JSONObject gobj = new JSONObject(g);
+		JSONArray participants = gobj.getJSONArray("participants");
+		
+		CurrentGame cg = new CurrentGame();
+		
+		for (int i = 0; i < participants.length(); i++) {
+			 JSONObject participant = participants.getJSONObject(i);
+			 long sid = participant.getLong("summonerId");
+			 int champ = participant.getInt("championId");
+			 
+			 cg.set(i+1, sid, champ);
+		}
+		
+		return cg;
+		
 		
 	}
 	
 	
 	// find statistics on games as a certain champion on certain role
-	public static void search(long accountId, int champNum, int season) throws Exception {
+	public static void search(long accountId, int champNum, int season, String role) throws Exception {
 		
 		String matchRequest = "https://na1.api.riotgames.com/lol/match/v3/matchlists/"
 				+ "by-account/" + accountId
-				+ "?queue=420"	// 420 is the queueid for solo queue
-				+ "&season=" + season 
+//				+ "?queue=440"	// 420 is the queueid for solo queue
+				+ "?season=" + season 
 				+ "&champion=" + champNum
 				+ "&api_key=" + apiKey;
 		String result = getHTML(matchRequest);
 		JSONObject obj = new JSONObject(result);
 		JSONArray matchlist = obj.getJSONArray("matches");
-		int numMatches = obj.getInt("totalGames");
+		int numMatches = matchlist.length();
 		System.out.println(numMatches);
 		
 		// after you get the matchlist, iterate through the matches; only go deeper
@@ -708,69 +791,75 @@ public class Main {
 		StandardStat ss = new StandardStat();
 		PreTwentyStat pts = new PreTwentyStat();
 		
-		int matchesToCheck = 20;
+		int matchesToCheck = 10;
 		
-		// possibility of having less than 10 solo queue games on a champion
-		if (matchesToCheck > numMatches) {
-			matchesToCheck = numMatches;
-		}
+		int numGames = 0;
+		int numGamesOnRole = 0;
+		int numInvalidRoleGames = 0;
+		int numRemakes = 0;
 		
-		for (int i = 0; i < matchesToCheck; i++) {
+		for (int i = 0; i < numMatches; i++) {
 			long id = matchlist.getJSONObject(i).getLong("gameId");
 			BigInteger matchId = new BigInteger(Long.toString(id));
 			JSONObject matchobj = getMatchById(matchId);
 			int matchDuration = matchobj.getInt("gameDuration");
 			
 			Match m = createPlayers(matchobj, champNum);
+			m.printAll();
+			boolean validRoles = m.validRoles();
+			System.out.println("right role: " + m.playerRightRole(role));
+			System.out.println("invalid role: " + validRoles);
 			
-			// check for valid roles and match duration of at least 15
-			if (m.validRoles() && matchDuration >= 900) {
-				addStandard(matchobj, m, ss);
+			if (validRoles && matchDuration >= 900 && m.playerRightRole(role)) {
 				
-				JSONObject t = getTimeline(matchId);
-				addPreTwentyStats(t, m, pts);
-				
-			//skip if roles are not assigned properly; make sure not to keep trying to fill 10 games if there are less matches
-			} else if (numMatches != matchesToCheck) {
-				matchesToCheck++;
+				// not specifically searching for role (just standard stats)
+				if (role.equals("")) {
+					addStandard(matchobj, m, ss);
+					numGames++;
+					
+				// specifically searching for role to calculate advanced stats
+				} else {
+					JSONObject t = getTimeline(matchId);
+					addPreTwentyStats(t, m, pts);
+					numGamesOnRole++;
+				}
+			} else if (!(matchDuration >= 900)){
+				numRemakes++;
+			} else if (!validRoles){
+				numInvalidRoleGames++;
+			}
+			
+			// check length of lists in stats, if they are at desired num 
+			if (matchesToCheck == ss.size() || matchesToCheck == pts.size()) {
+				break;
 			}
 			
 		}
 		
-//		AvgStandardStat ass = ss.findAverage();
-//		ass.print();
-//		
-//		AvgPreTwentyStat apts = pts.findAverage();
-//		apts.print();
+		System.out.println("Num Games: " + numGames);
+		System.out.println("Num Games on Role: " + numGamesOnRole);
+		System.out.println("Num Invalid Roles: " + numInvalidRoleGames);
+		System.out.println("Num Remakes: " + numRemakes);
+		if (numGamesOnRole == 0) {
+			AvgStandardStat ass = ss.findAverage();
+			ass.print();
+		} else {
+			AvgPreTwentyStat apts = pts.findAverage();
+			apts.print();
+		}
 		
 		// @DAVID
 		// THE NUMBER WITHIN THE PARAMETER IS THE GAME NUMBER (SEE #2 OF THE INSTRUCTIONS
-		ss.printGameStandard(1);
-		pts.printGamePreTwenty(1);
+//		ss.printGameStandard(1);
+//		pts.printGamePreTwenty(1);
 		
 	}
 	
 	public static void main(String[] args) throws Exception{		
 		
-		/*
-		 *  FOR DAVID: TESTING INSTRUCTIONS:
-		 *  DON'T MIND THE CODE ABOVE, JUST STICK TO THIS PART OF THE MAIN FUNCTION
-		 *  1. LOOK UP SOME GAMES (5 GAMES WOULD BE ENOUGH) ON OP.GG FOR A CERTAIN CHAMPION YOU PLAY, MAKE SURE THESE ARE SOLO QUEUE GAMES
-		 *  2. FIND HOW RECENT IT IS AND USE THAT NUMBER AS THE PARAMETER OF THE TWO PRINTGAME FUNCTIONS
-		 *  	FOR EX: MOST RECENT GAME IS #1, NEXT RECENT IS #2 AND SO ON..
-		 *  	YOU CAN FIND THE CALLS OF THE PRINTGAME FUNCTION WITHIN THE FUNCTION TITLED "SEARCH" WHICH IS RIGHT ABOVE THE MAIN (I COMMENTED @DAVID ABOVE IT)
-		 *  3. ON THE VERY BOTTOM OF THIS FUNCTION (MAIN) YOU FIND THE SEARCH FUNCTION CALL. CHANGE THE PARAMETERS BASED ON THE GAME YOU'RE LOOKING UP
-		 *  4. LOOK AT RESULTS AND COMPARE IT WITH THE ACTUAL GAME RESULTS (YOU WILL HAVE TO WATCH THE GAME REPLAY TO MAKE SURE THE STATS WORK)
-		 *  5. IF ANY STAT IS WRONG, OR ANYTHING IS CONFUSING, OR THE CODE CRASHES (LAST ONE IS ESPECIALLY IMPORTANT) TAKE NOT OF IT AND CONTINUE WORKING
-		 *  6. POST ON THE GROUP CHAT WITH THE RESULTS AFTER ALL THE TESTING IN COMPLETE
-		 *  
-		 *  
-		 *  THERE WILL BE MORE COMMENTS BELOW TO HELP YOU 
-		 */
-		
 		// SOME CHAMP NUMS:
-		// 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh
-		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 
+		// 39 irelia 33 rammus 113 sejuani 90 malzahar 412 thresh 59 jarvan
+		//69 cass 157 yasuo 102 shyvana 105 fizz 83 yorick 57 maokai 80 pantheon
 		// 59 jarvan 45 veigar 36 mundo 18 trist 63 brand
 		//64 lee sin 2 olaf 76 nidalee 412 thresh
 		
@@ -784,7 +873,19 @@ public class Main {
 		// RUN SEARCH FUNCTION
 		// PARAMETERS: ACCOUNTID, CHAMP NUM, SEASON
 		// SEASON SHOULD ALWAYS BE ON 9, BUT REST YOU SHOULD CHANGE BASED ON WHAT YOU'RE LOOKING FOR
-		search(218887656, 39, 9);
+		search(218887656, 45, 9, "top");
+		
+//		CurrentGame c = getCurrentGame("LightningLash");
+//		c.print();
+		
+		
+		/* HOW CODE SHOULD WORK:
+		 * 1. RUN CURRENT GAME TO GET ACCOUNT ID AND CHAMP NUM FOR EACH CHAMPION
+		 * 2. GET STANDARD DATA USING JUST ACCOUNT ID AND CHAMP NUM (THIS WILL BE DISPLAYED BY DEFAULT)
+		 * 3. USER MANUALLY ENTERS ROLES
+		 * 4. GET ADVANCED DATA USING USER INPUT AND OTHER CURRENT GAME INFO
+		 */
+		
 		
 		
 	}
